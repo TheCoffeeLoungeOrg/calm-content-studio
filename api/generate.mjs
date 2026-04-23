@@ -17,15 +17,20 @@ export default async function handler(req, res) {
     const dateString = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     // 1. DATABASE CHECK
-    let { data: user } = await supabase.from('user_usage')
+    const cleanEmail = email.toLowerCase().trim();
+
+    let { data: user, error: dbError } = await supabase
+      .from('user_usage')
       .select('*')
-      .eq('email', email.toLowerCase().trim())
+      // .ilike makes the search case-insensitive (ignores Caps vs No Caps)
+      .ilike('email', cleanEmail) 
       .single();
 
-    // If user doesn't exist, create them as 'Essential'
+    // If user doesn't exist, we can still create them as 'Essential' 
+    // but we use the clean lowercase version to keep your database tidy.
     if (!user) {
       const { data: newUser } = await supabase.from('user_usage').insert([{ 
-        email: email.toLowerCase().trim(), 
+        email: cleanEmail, 
         usage_count: 0, 
         monthly_limit: 20, 
         membership_plan: 'Essential' 

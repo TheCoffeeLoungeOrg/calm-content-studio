@@ -16,14 +16,13 @@ export default async function handler(req, res) {
     const today = new Date();
     const dateString = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    // 1. DATABASE CHECK - UPDATED FOR NEW COLUMNS
-    // We now select 'membership_plan' and 'monthly_limit'
+    // 1. DATABASE CHECK
     let { data: user } = await supabase.from('user_usage')
       .select('*')
       .eq('email', email.toLowerCase().trim())
       .single();
 
-    // If user doesn't exist, create them as 'Essential' with 20 credits
+    // If user doesn't exist, create them as 'Essential'
     if (!user) {
       const { data: newUser } = await supabase.from('user_usage').insert([{ 
         email: email.toLowerCase().trim(), 
@@ -35,8 +34,9 @@ export default async function handler(req, res) {
     }
 
     // 2. TIERED LIMIT CHECK
-    // If they aren't Professional and they hit their limit, block them
-    if (user.membership_plan !== 'Professional' && user.usage_count >= user.monthly_limit) {
+    // Professional members always pass. Essential members checked against monthly_limit.
+    const isProfessional = user.membership_plan === 'Professional';
+    if (!isProfessional && user.usage_count >= user.monthly_limit) {
        return res.status(403).json({ error: "Your monthly limit has been reached." });
     }
 
@@ -76,33 +76,33 @@ export default async function handler(req, res) {
 
     const data = await aiResponse.json();
     
-    if (data.error && data.error.code === 503) {
-        return res.status(200).json({ error: "The Studio is super busy right now, give the button another click!" });
-    }
-
-    if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-        return res.status(500).json({ error: "The Studio is having a moment. Please try again!" });
+    if (data.error) {
+        return res.status(500).json({ error: "Gemini AI Error: " + data.error.message });
     }
 
     const resultText = data.candidates[0].content.parts[0].text;
 
     // 4. SMART CREDIT DEDUCTION
-    let newCount = user.usage_count;
+    let currentUsage = user.usage_count;
     
-    // Only add to the count if they are on the Essential plan
-    if (user.membership_plan !== 'Professional') {
-        newCount = user.usage_count + 1;
-        await supabase.from('user_usage').update({ usage_count: newCount }).eq('email', email.toLowerCase().trim());
+    // Only increment and update DB if they ARE NOT Professional
+    if (!isProfessional) {
+        currentUsage = user.usage_count + 1;
+        await supabase.from('user_usage').update({ usage_count: currentUsage }).eq('email', email.toLowerCase().trim());
     }
     
-    // 5. RETURN RESULTS WITH PLAN INFO
+    // 5. RETURN RESULTS
+    // If Pro, we send 999. If Essential, we do the math safely.
+    const remainingCount = isProfessional ? 999 : (user.monthly_limit - currentUsage);
+
     return res.status(200).json({ 
       results: JSON.parse(resultText), 
-      remaining: user.membership_plan === 'Professional' ? 999 : (user.monthly_limit - newCount),
+      remaining: remainingCount,
       plan: user.membership_plan
     });
 
   } catch (error) {
-    return res.status(500).json({ error: "The Studio is super busy right now, give the button another click!" });
+    console.error("Studio Error:", error);
+    return res.status(500).json({ error: "The Studio encountered an error. Please try again." });
   }
 }

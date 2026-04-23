@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
     const systemInstruction = `Act as a master content strategist. Tone: "${tone}". ${lengthInstruction}
-    CRITICAL: Today's date is ${dateString}. Ensure all seasonal and year references (like ${currentYear}) are strictly accurate.
+    CRITICAL: Today's date is ${dateString}. Only mention the year or specific date if it is naturally relevant to the content; do not force "2026" into every post.
     
     REQUIRED: Generate content for: ${platforms.join(', ')}. 
     

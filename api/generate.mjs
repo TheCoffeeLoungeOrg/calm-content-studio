@@ -13,25 +13,38 @@ export default async function handler(req, res) {
     const { content, platforms, tone, email, lengthPreference } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // Get the current date dynamically
     const today = new Date();
-    const currentYear = today.getFullYear();
     const dateString = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    // 1. Database Check
-    let { data: user } = await supabase.from('user_usage').select('*').eq('email', email.toLowerCase().trim()).single();
+    // 1. DATABASE CHECK - UPDATED FOR NEW COLUMNS
+    // We now select 'membership_plan' and 'monthly_limit'
+    let { data: user } = await supabase.from('user_usage')
+      .select('*')
+      .eq('email', email.toLowerCase().trim())
+      .single();
+
+    // If user doesn't exist, create them as 'Essential' with 20 credits
     if (!user) {
-      const { data: newUser } = await supabase.from('user_usage').insert([{ email: email.toLowerCase().trim(), usage_count: 0, max_limit: 100 }]).select().single();
+      const { data: newUser } = await supabase.from('user_usage').insert([{ 
+        email: email.toLowerCase().trim(), 
+        usage_count: 0, 
+        monthly_limit: 20, 
+        membership_plan: 'Essential' 
+      }]).select().single();
       user = newUser;
     }
-    if (user.usage_count >= user.max_limit) return res.status(403).json({ error: "Limit reached." });
 
-    // 2. Length Logic
+    // 2. TIERED LIMIT CHECK
+    // If they aren't Professional and they hit their limit, block them
+    if (user.membership_plan !== 'Professional' && user.usage_count >= user.monthly_limit) {
+       return res.status(403).json({ error: "Your monthly limit has been reached." });
+    }
+
     const lengthInstruction = lengthPreference === 'short' 
       ? "Keep the POST_CONTENT punchy and concise (1-2 paragraphs)." 
       : "Provide a substantial, deep-dive POST_CONTENT (3-4 paragraphs).";
 
-    // 3. AI Call with Dynamic Date
+    // 3. AI CALL
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
     const systemInstruction = `Act as a master content strategist. Tone: "${tone}". ${lengthInstruction}
@@ -72,12 +85,21 @@ export default async function handler(req, res) {
     }
 
     const resultText = data.candidates[0].content.parts[0].text;
-    const newCount = user.usage_count + 1;
-    await supabase.from('user_usage').update({ usage_count: newCount }).eq('email', email.toLowerCase().trim());
+
+    // 4. SMART CREDIT DEDUCTION
+    let newCount = user.usage_count;
     
+    // Only add to the count if they are on the Essential plan
+    if (user.membership_plan !== 'Professional') {
+        newCount = user.usage_count + 1;
+        await supabase.from('user_usage').update({ usage_count: newCount }).eq('email', email.toLowerCase().trim());
+    }
+    
+    // 5. RETURN RESULTS WITH PLAN INFO
     return res.status(200).json({ 
       results: JSON.parse(resultText), 
-      remaining: user.max_limit - newCount 
+      remaining: user.membership_plan === 'Professional' ? 999 : (user.monthly_limit - newCount),
+      plan: user.membership_plan
     });
 
   } catch (error) {

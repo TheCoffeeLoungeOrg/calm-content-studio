@@ -27,26 +27,29 @@ export default async function handler(req, res) {
     const systemInstruction = `Act as a master content strategist. Tone: "${tone}". 
     REQUIRED: Generate content for: ${platforms.join(', ')}. 
     
-    For each platform, provide:
-    - POST_CONTENT: Use <br><br> between paragraphs for spacing.
-    - STRATEGIC_HASHTAGS: For all platforms other than Newsletter.
-    - CALL_TO_ACTION: A clear closing.
-    - NO EM DASH
+    For each platform, follow these strict structural rules:
+    - NEWSLETTER_SUBJECT: (ONLY for the Newsletter platform) Provide 3 catchy, high opening subject line options.
+    - POST_CONTENT: Provide a substantial, engaging 3-4 paragraph response. Dive into the "why" and "how". Use <br><br> between every paragraph for spacing.
+    - STRATEGIC_HASHTAGS: Provide 3-5 relevant hashtags for all platforms except for Newsletter.
+    - CALL_TO_ACTION: Provide a clear, encouraging closing line.
     
-    Return as SINGLE JSON object. No markdown, no backticks.`;
+    Return the response as a SINGLE JSON object where the keys are the platform names. Do not include markdown backticks or the word "json".`;
 
     const aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: systemInstruction + `\n\nInput: "${content}"` }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
+        contents: [{ parts: [{ text: systemInstruction + `\n\nInput Source Material: "${content}"` }] }],
+        generationConfig: { 
+            responseMimeType: "application/json", 
+            temperature: 0.7 
+        }
       })
     });
 
     const data = await aiResponse.json();
     
-    // 3. Handle the "High Demand" (503) Busy Signal
+    // 3. Handle Gemini High Demand (Busy Signal)
     if (data.error && data.error.code === 503) {
         return res.status(200).json({ 
             error: "The Studio is super busy right now, give the button another click!",
@@ -55,21 +58,23 @@ export default async function handler(req, res) {
     }
 
     if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-        return res.status(500).json({ error: "AI error. Please try again." });
+        return res.status(500).json({ error: "The Studio is having a moment. Please try again!" });
     }
 
     const resultText = data.candidates[0].content.parts[0].text;
     
-    // 4. Update usage count
+    // 4. Update usage count in Supabase
     const newCount = user.usage_count + 1;
     await supabase.from('user_usage').update({ usage_count: newCount }).eq('email', email.toLowerCase().trim());
     
+    // 5. Send back results
     return res.status(200).json({ 
       results: JSON.parse(resultText), 
       remaining: user.max_limit - newCount 
     });
 
   } catch (error) {
-    return res.status(500).json({ error: "The Studio is having a moment. Please try again!" });
+    console.error("Internal Error:", error);
+    return res.status(500).json({ error: "The Studio is super busy right now, give the button another click!" });
   }
 }

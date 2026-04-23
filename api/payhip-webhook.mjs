@@ -40,14 +40,13 @@ const productName = req.body.product_name || req.body.plan_name || req.body.item
     console.log(`Processing ${plan} for ${email}`);
 
     const { error } = await supabase
-      .from('user_usage')
-      .upsert({ 
-        email: email.toLowerCase().trim(), 
-        membership_plan: plan, 
-        monthly_limit: limit,
-        usage_count: 0 
-      }, { onConflict: 'email' });
-
+  .from('user_usage') // <--- Make sure this matches your table name exactly
+  .upsert({ 
+    email: email.toLowerCase().trim(), 
+    membership_plan: plan, 
+    monthly_limit: limit,
+    usage_count: 0 
+  }, { onConflict: 'email' });
     if (error) {
       console.error("Supabase Error:", error);
       return res.status(500).json({ error: error.message });

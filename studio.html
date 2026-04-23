@@ -22,7 +22,7 @@
         .member-gate { background: #f9faf9; border: 1px solid #e8ebe8; padding: 20px; border-radius: 12px; margin-bottom: 3rem; text-align: center; }
         .member-input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 250px; font-family: 'Georgia', serif; margin-right: 10px; }
         .usage-badge { display: inline-block; margin-top: 10px; font-size: 0.85rem; color: #8F9B8A; font-style: italic; }
-        .step-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem; color: #111; display: block; text-align: left; }
+        .step-title { font-size: 1.1rem; font-weight: bold; margin-top: 2rem; margin-bottom: 1rem; color: #111; display: block; text-align: left; }
         .white-box { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; padding: 25px; margin-bottom: 2rem; word-wrap: break-word; }
         .pill-container { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 2rem; }
         .pill { padding: 10px 20px; border-radius: 25px; border: 1px solid #dcdcdc; background-color: white; color: #555; cursor: pointer; transition: 0.2s ease; font-size: 0.9rem; -webkit-user-select: none; }
@@ -59,8 +59,6 @@
             <p id="wordCount" style="font-size:0.8rem; color:#888; text-align:right;">0 words</p>
         </div>
 
-        <div class="divider"></div>
-
         <label class="step-title">Step 2 - Where would you like to show up?</label>
         <div class="pill-container" id="platformList">
             <div class="pill" data-platform="Facebook Page">Facebook Page</div>
@@ -73,8 +71,6 @@
             <span id="selectAllToggle" style="cursor:pointer; text-decoration:underline; font-size:0.8rem; margin-left:10px;">Select All</span>
         </div>
 
-        <div class="divider"></div>
-
         <label class="step-title">Step 3 - How do you want to sound?</label>
         <div class="pill-container" id="toneList">
             <div class="pill" data-tone="Warm & Supportive">Warm & Supportive</div>
@@ -84,11 +80,11 @@
         </div>
 
         <label class="step-title">Step 4 - Content Depth</label>
-<div class="pill-container" id="lengthToggle">
-    <div class="pill active" data-length="short">Short & Punchy</div>
-    <div class="pill" data-length="deep">Deep Dive</div>
-</div>
-        
+        <div class="pill-container" id="lengthToggle">
+            <div class="pill active" data-length="short">Short & Punchy</div>
+            <div class="pill" data-length="deep">Deep Dive</div>
+        </div>
+
         <button class="create-btn" id="generateButton">Create my content <i class="fa-solid fa-arrow-right-long" style="margin-left:15px;"></i></button>
         
         <div id="email-section" class="white-box text-center">
@@ -101,17 +97,25 @@
 
 <script>
     let lastGeneratedContent = "";
-    // PASTE YOUR GOOGLE SCRIPT URL HERE
+    // PASTE YOUR NEW GOOGLE SCRIPT URL HERE
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyl9uYrUIkXI0fuSekj3hBTA9WXiCKOS9WA_CfzDbDdw0Vf8gMAJU7PBztKbgmMdHeiw/exec";
 
     document.addEventListener('click', function(e) {
         const platformPill = e.target.closest('#platformList .pill');
         if (platformPill) platformPill.classList.toggle('active');
+        
         const tonePill = e.target.closest('#toneList .pill');
         if (tonePill) {
             document.querySelectorAll('#toneList .pill').forEach(p => p.classList.remove('active'));
             tonePill.classList.add('active');
         }
+
+        const lengthPill = e.target.closest('#lengthToggle .pill');
+        if (lengthPill) {
+            document.querySelectorAll('#lengthToggle .pill').forEach(p => p.classList.remove('active'));
+            lengthPill.classList.add('active');
+        }
+
         if (e.target.id === 'selectAllToggle') {
             const pills = document.querySelectorAll('#platformList .pill');
             const anyInactive = Array.from(pills).some(p => !p.classList.contains('active'));
@@ -144,6 +148,7 @@
         const memberEmail = document.getElementById('memberEmail').value.trim();
         const selectedPlatforms = Array.from(document.querySelectorAll('#platformList .pill.active')).map(p => p.dataset.platform);
         const selectedTone = document.querySelector('#toneList .pill.active')?.dataset.tone;
+        const selectedLength = document.querySelector('#lengthToggle .pill.active')?.dataset.length;
         
         if (!memberEmail) return alert("Please enter your email!");
         if (!blogContent || selectedPlatforms.length === 0) return alert("Complete the steps above!");
@@ -157,18 +162,18 @@
            const response = await fetch("/api/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content: blogContent, platforms: selectedPlatforms, tone: selectedTone, email: memberEmail })
+                body: JSON.stringify({ 
+                    content: blogContent, 
+                    platforms: selectedPlatforms, 
+                    tone: selectedTone, 
+                    email: memberEmail,
+                    lengthPreference: selectedLength 
+                })
             });
             let dataPackage = await response.json();
             
-            if (response.status === 403 || dataPackage.error === "Limit reached.") {
-                usageTracker.textContent = "Monthly limit reached.";
-                resultsArea.innerHTML = `<div class="white-box" style="text-align:center;">You have reached your monthly limit.</div>`;
-                return;
-            }
-
-            if (response.status !== 200 || dataPackage.error) {
-                resultsArea.innerHTML = `<div class="white-box" style="text-align:center; color:#d9534f;">${dataPackage.message || dataPackage.error || "Server Error"}</div>`;
+            if (dataPackage.error) {
+                resultsArea.innerHTML = `<div class="white-box" style="text-align:center; color:#d9534f;">${dataPackage.error}</div>`;
                 return;
             }
 

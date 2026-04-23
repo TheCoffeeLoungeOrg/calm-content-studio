@@ -16,8 +16,11 @@ export default async function handler(req, res) {
   }
 
   // Payhip sends different fields based on the event type
-  const email = req.body.email || req.body.customer_email;
-  const productName = req.body.product_name || req.body.plan_name || req.body.item_name;
+  // 19. A wider net to catch the email
+const email = req.body.email || req.body.customer_email || req.body.subscriber_email;
+
+// 20. A wider net to catch the plan/product name
+const productName = req.body.product_name || req.body.plan_name || req.body.item_name || req.body.subscription_name;
 
   if (!email || !productName) {
     console.log("MISSING DATA: Email or Product Name not found in body");

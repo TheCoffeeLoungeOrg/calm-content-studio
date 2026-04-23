@@ -13,6 +13,7 @@ export default async function handler(req, res) {
     const { content, platforms, tone, email } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
+    // 1. Check/Update Usage in Supabase
     let { data: user } = await supabase.from('user_usage').select('*').eq('email', email.toLowerCase().trim()).single();
     if (!user) {
       const { data: newUser } = await supabase.from('user_usage').insert([{ email: email.toLowerCase().trim(), usage_count: 0, max_limit: 100 }]).select().single();
@@ -20,15 +21,15 @@ export default async function handler(req, res) {
     }
     if (user.usage_count >= user.max_limit) return res.status(403).json({ error: "Limit reached." });
 
+    // 2. Call Gemini 3 Flash
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
-    // UPDATED INSTRUCTION: Specifically asking for <br> tags for paragraphs
     const systemInstruction = `Act as a master content strategist. Tone: "${tone}". 
     REQUIRED: Generate content for: ${platforms.join(', ')}. 
     
     For each platform, provide:
-    - POST_CONTENT: Use <br><br> between paragraphs to ensure clear spacing.
-    - STRATEGIC_HASHTAGS: Relevant tags.
+    - POST_CONTENT: Use <br><br> between paragraphs for spacing.
+    - STRATEGIC_HASHTAGS: Relevant tags. Never for newsletter.
     - CALL_TO_ACTION: A clear closing.
     
     Return as SINGLE JSON object. No markdown, no backticks.`;
@@ -44,13 +45,21 @@ export default async function handler(req, res) {
 
     const data = await aiResponse.json();
     
+    // 3. Handle the "High Demand" (503) Busy Signal
     if (data.error && data.error.code === 503) {
-        return res.status(503).json({ error: "AI is currently busy. Please wait 30 seconds and try again." });
+        return res.status(200).json({ 
+            error: "The Studio is super busy right now, give the button another click!",
+            isRetryable: true 
+        });
     }
 
-    if (!data.candidates) return res.status(500).json({ error: "AI error." });
+    if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+        return res.status(500).json({ error: "AI error. Please try again." });
+    }
 
     const resultText = data.candidates[0].content.parts[0].text;
+    
+    // 4. Update usage count
     const newCount = user.usage_count + 1;
     await supabase.from('user_usage').update({ usage_count: newCount }).eq('email', email.toLowerCase().trim());
     
@@ -60,6 +69,6 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    return res.status(500).json({ error: "Studio error.", message: error.message });
+    return res.status(500).json({ error: "The Studio is having a moment. Please try again!" });
   }
 }

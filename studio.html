@@ -1,0 +1,219 @@
+<script>
+    // Payhip Membership Gate
+    if (typeof payhip === 'undefined' || !payhip.customer_email) {
+        window.location.href = "https://payhip.com/b/WFobf";
+    }
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calm Content Studio</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        #ccs-wrapper { font-family: 'Georgia', serif; max-width: 900px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.6; background-color: #fff; }
+        .text-center { text-align: center; }
+        .mb-16 { margin-bottom: 4rem; }
+        h1 { font-size: 2.8rem; font-weight: normal; margin-bottom: 0.5rem; color: #111; }
+        .studio-subtitle { font-size: 1.1rem; color: #8F9B8A; margin-bottom: 1rem; }
+        .tagline { font-size: 1rem; font-style: italic; color: #666; max-width: 600px; margin: 0 auto; }
+        .member-gate { background: #f9faf9; border: 1px solid #e8ebe8; padding: 20px; border-radius: 12px; margin-bottom: 3rem; text-align: center; }
+        .member-input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 250px; font-family: 'Georgia', serif; margin-right: 10px; }
+        .usage-badge { display: inline-block; margin-top: 10px; font-size: 0.85rem; color: #8F9B8A; font-style: italic; }
+        .step-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem; color: #111; display: block; text-align: left; }
+        .white-box { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; padding: 25px; margin-bottom: 2rem; word-wrap: break-word; }
+        .pill-container { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 2rem; }
+        .pill { padding: 10px 20px; border-radius: 25px; border: 1px solid #dcdcdc; background-color: white; color: #555; cursor: pointer; transition: 0.2s ease; font-size: 0.9rem; -webkit-user-select: none; }
+        .pill.active { background-color: #8F9B8A !important; border-color: #8F9B8A !important; color: white !important; }
+        textarea { border: none; font-size: 1rem; font-style: italic; color: #666; width: 100%; height: 150px; resize: none; background: transparent; }
+        textarea:focus { outline: none; }
+        .divider { border-top: 1px solid #eee; margin: 3rem 0; }
+        .create-btn { background-color: #8F9B8A; color: white; font-family: 'Georgia', serif; font-style: italic; font-size: 1.3rem; padding: 15px 50px; border-radius: 12px; width: 100%; cursor: pointer; border: none; margin-top: 2rem; transition: 0.3s; }
+        .create-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        #email-section { display: none; margin-top: 30px; animation: fadeIn 0.5s; background: #fdfdfd; border: 1px dashed #8F9B8A; }
+        .send-email-btn { background:#8F9B8A; color:white; padding:12px 30px; border-radius:25px; border:none; cursor:pointer; font-family: 'Georgia', serif; font-style: italic; transition: 0.3s; }
+        .result-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .platform-label { color: #8F9B8A; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .copy-btn { background: none; border: 1px solid #8F9B8A; color: #8F9B8A; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div id="ccs-wrapper">
+        <div class="text-center mb-16">
+            <h1>Calm Content Studio</h1>
+            <p class="studio-subtitle">| By The Coffee Lounge</p>
+            <p class="tagline">Turn one piece of writing into content for every platform.</p>
+        </div>
+        
+        <div class="member-gate">
+            <p style="margin-bottom: 10px; font-weight: bold;">Enter your email address to access your studio</p>
+            <input type="email" id="memberEmail" class="member-input" placeholder="Your membership email...">
+            <span id="usageTracker" class="usage-badge">Your credit count will update after creation</span>
+        </div>
+
+        <label class="step-title">Step 1 - Share your thoughts</label>
+        <div class="white-box">
+            <textarea id="blogTextarea" placeholder="Paste your blog post, newsletter, or rough notes here..."></textarea>
+            <p id="wordCount" style="font-size:0.8rem; color:#888; text-align:right;">0 words</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <label class="step-title">Step 2 - Where would you like to show up?</label>
+        <div class="pill-container" id="platformList">
+            <div class="pill" data-platform="Facebook Page">Facebook Page</div>
+            <div class="pill" data-platform="Facebook Group">Facebook Group</div>
+            <div class="pill" data-platform="Instagram">Instagram</div>
+            <div class="pill" data-platform="Pinterest">Pinterest</div>
+            <div class="pill" data-platform="LinkedIn">LinkedIn</div>
+            <div class="pill" data-platform="TikTok">TikTok</div>
+            <div class="pill" data-platform="Newsletter">Newsletter</div>
+            <span id="selectAllToggle" style="cursor:pointer; text-decoration:underline; font-size:0.8rem; margin-left:10px;">Select All</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <label class="step-title">Step 3 - How do you want to sound?</label>
+        <div class="pill-container" id="toneList">
+            <div class="pill" data-tone="Warm & Supportive">Warm & Supportive</div>
+            <div class="pill active" data-tone="Calm & Grounded">Calm & Grounded</div>
+            <div class="pill" data-tone="Confident & Clear">Confident & Clear</div>
+            <div class="pill" data-tone="Professional & Polished">Professional & Polished</div>
+        </div>
+
+        <button class="create-btn" id="generateButton">Create my content <i class="fa-solid fa-arrow-right-long" style="margin-left:15px;"></i></button>
+        
+        <div id="email-section" class="white-box text-center">
+            <p style="margin-bottom:15px;">Your content is ready. Email a copy to your membership address?</p>
+            <button class="send-email-btn" id="sendEmailBtn">Email me these results <i class="fa-solid fa-envelope" style="margin-left:8px;"></i></button>
+        </div>
+
+        <div id="results-area" style="margin-top: 40px;"></div>
+    </div>
+
+<script>
+    let lastGeneratedContent = "";
+    // PASTE YOUR GOOGLE SCRIPT URL HERE
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyl9uYrUIkXI0fuSekj3hBTA9WXiCKOS9WA_CfzDbDdw0Vf8gMAJU7PBztKbgmMdHeiw/exec";
+
+    document.addEventListener('click', function(e) {
+        const platformPill = e.target.closest('#platformList .pill');
+        if (platformPill) platformPill.classList.toggle('active');
+        const tonePill = e.target.closest('#toneList .pill');
+        if (tonePill) {
+            document.querySelectorAll('#toneList .pill').forEach(p => p.classList.remove('active'));
+            tonePill.classList.add('active');
+        }
+        if (e.target.id === 'selectAllToggle') {
+            const pills = document.querySelectorAll('#platformList .pill');
+            const anyInactive = Array.from(pills).some(p => !p.classList.contains('active'));
+            pills.forEach(p => anyInactive ? p.classList.add('active') : p.classList.remove('active'));
+            e.target.textContent = anyInactive ? 'Deselect All' : 'Select All';
+        }
+    });
+
+    document.getElementById('blogTextarea').addEventListener('input', function() {
+        const words = this.value.trim() ? this.value.trim().split(/\s+/).length : 0;
+        document.getElementById('wordCount').textContent = words + ' words';
+    });
+
+    async function triggerEmail(email, content, remaining) {
+        const params = new URLSearchParams();
+        params.append('to_email', email);
+        params.append('content', content);
+        params.append('remaining', remaining);
+        try {
+            await fetch(GOOGLE_SCRIPT_URL, { method: "POST", body: params, mode: "no-cors" });
+        } catch (e) { console.log("Email failed", e); }
+    }
+
+    document.getElementById('generateButton').addEventListener('click', async function() {
+        const btn = this;
+        const resultsArea = document.getElementById('results-area');
+        const emailSection = document.getElementById('email-section');
+        const usageTracker = document.getElementById('usageTracker');
+        const blogContent = document.getElementById('blogTextarea').value.trim();
+        const memberEmail = document.getElementById('memberEmail').value.trim();
+        const selectedPlatforms = Array.from(document.querySelectorAll('#platformList .pill.active')).map(p => p.dataset.platform);
+        const selectedTone = document.querySelector('#toneList .pill.active')?.dataset.tone;
+        
+        if (!memberEmail) return alert("Please enter your email!");
+        if (!blogContent || selectedPlatforms.length === 0) return alert("Complete the steps above!");
+        
+        btn.disabled = true;
+        btn.innerHTML = 'Repurposing...';
+        resultsArea.innerHTML = '';
+        emailSection.style.display = "none";
+        
+        try {
+           const response = await fetch("/api/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: blogContent, platforms: selectedPlatforms, tone: selectedTone, email: memberEmail })
+            });
+            let dataPackage = await response.json();
+            
+            if (response.status === 403 || dataPackage.error === "Limit reached.") {
+                usageTracker.textContent = "Monthly limit reached.";
+                resultsArea.innerHTML = `<div class="white-box" style="text-align:center;">You have reached your monthly limit.</div>`;
+                return;
+            }
+
+            if (response.status !== 200 || dataPackage.error) {
+                resultsArea.innerHTML = `<div class="white-box" style="text-align:center; color:#d9534f;">${dataPackage.message || dataPackage.error || "Server Error"}</div>`;
+                return;
+            }
+
+            if (dataPackage.remaining !== undefined) {
+                usageTracker.textContent = `Success. You have ${dataPackage.remaining} uses left this month.`;
+            }
+
+            let data = dataPackage.results;
+            resultsArea.innerHTML = '<div class="divider"></div>';
+            lastGeneratedContent = "";
+
+            Object.entries(data).forEach(([key, platformContent]) => {
+                const card = document.createElement('div');
+                card.className = 'white-box';
+                let platformTitle = key.replace(/_/g, ' ');
+
+                let innerHtml = `<div class="result-card-header"><span class="platform-label">${platformTitle}</span><button class="copy-btn">Copy All</button></div><div class="card-body">`;
+                let contentString = `PLATFORM: ${platformTitle}\n\n`;
+
+                Object.entries(platformContent).forEach(([label, cleanText]) => {
+                    innerHtml += `<div style="margin-bottom: 25px;"><span style="color:#8F9B8A; font-weight:bold; font-size:0.75rem; text-transform:uppercase; display:block; margin-bottom:8px; border-bottom:1px solid #f0f0f0;">${label.replace(/_/g, ' ')}</span><div style="color:#444; line-height:1.6;">${cleanText}</div></div>`;
+                    contentString += `${label.toUpperCase()}:\n${String(cleanText).replace(/<br>/g, '\n')}\n\n`;
+                });
+                
+                innerHtml += '</div>';
+                card.innerHTML = innerHtml;
+                resultsArea.appendChild(card);
+                lastGeneratedContent += contentString + "-------------------\n\n";
+                card.querySelector('.copy-btn').addEventListener('click', function() {
+                    navigator.clipboard.writeText(card.querySelector('.card-body').innerText);
+                    this.innerText = "Copied!";
+                    setTimeout(() => { this.innerText = "Copy All"; }, 2000);
+                });
+            });
+            emailSection.style.display = "block";
+        } catch (err) {
+            resultsArea.innerHTML = `<div class="white-box" style="color:red; text-align:center;">Display error. Please try again.</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Create my content <i class="fa-solid fa-arrow-right-long" style="margin-left:15px;"></i>';
+        }
+    });
+
+    document.getElementById('sendEmailBtn').addEventListener('click', async function() {
+        const memberEmail = document.getElementById('memberEmail').value.trim();
+        this.disabled = true;
+        this.innerText = "Sending...";
+        await triggerEmail(memberEmail, lastGeneratedContent, "Check Studio");
+        this.innerHTML = 'Sent! <i class="fa-solid fa-check"></i>';
+        setTimeout(() => { this.disabled = false; this.innerHTML = 'Email me these results <i class="fa-solid fa-envelope"></i>'; }, 3000);
+    });
+</script>
+</body>
+</html>

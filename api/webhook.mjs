@@ -6,36 +6,43 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  // Log the body so we can see it in Vercel if it fails again
+  console.log("Webhook Received:", JSON.stringify(req.body));
+
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Payhip sends data in the body
-  const { email, product_name, type } = req.body;
+  // Payhip uses different keys for different types of sales
+  const email = req.body.email || req.body.customer_email;
+  const productName = req.body.product_name || req.body.plan_name || req.body.item_name;
+  const type = req.body.type;
 
-  // We only care about new paid members
-  if (type === 'membership.created' || type === 'sale.finished') {
-    
-    // Determine plan details based on product name
+  // If we have an email and a product, we proceed
+  if (email && productName) {
     let plan = "Essential";
     let limit = 20;
 
-    if (product_name.includes("Professional")) {
+    // Search for "Professional" anywhere in the product title
+    if (productName.toLowerCase().includes("professional")) {
       plan = "Professional";
       limit = 999;
     }
 
-    // Upsert into Supabase (Update if exists, Insert if new)
     const { error } = await supabase
       .from('user_usage')
       .upsert({ 
         email: email.toLowerCase().trim(), 
         membership_plan: plan, 
         monthly_limit: limit,
-        usage_count: 0 // Reset usage for new/renewing members
+        usage_count: 0 
       }, { onConflict: 'email' });
 
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ status: "Member added successfully" });
+    if (error) {
+      console.error("Supabase Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(200).json({ status: "Success", plan: plan });
   }
 
-  return res.status(200).json({ status: "Ignored event type" });
+  return res.status(200).json({ status: "No valid data found in request" });
 }

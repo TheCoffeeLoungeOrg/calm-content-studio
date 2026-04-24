@@ -49,6 +49,14 @@ const systemInstruction = `You are a Master Content Strategist.
         Platforms: ${platforms.join(', ')}. 
         STRICT: Keep each post under 100 words. No fluff. Use <br><br> for breaks.`;
 
+// 2. AI CALL (STRICT JSON)
+        const systemInstruction = `You are a Master Content Strategist. 
+        Tone: ${tone}. Output ONLY a raw JSON object. 
+        No markdown, no backticks, no comments.
+        Keys: ${platforms.join(', ')}.
+        Each value must be a string. 
+        Use <br><br> for breaks.`;
+
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -56,22 +64,22 @@ const systemInstruction = `You are a Master Content Strategist.
                 contents: [{ parts: [{ text: systemInstruction + `\n\nMaterial: ${content}` }] }],
                 generationConfig: { 
                     responseMimeType: "application/json", 
-                    temperature: 0.1, 
-                    maxOutputTokens: 400 // Shorter = Much Faster
+                    temperature: 0.1
                 }
             })
         });
 
         const aiData = await aiResponse.json();
-
-        // SAFETY GUARD: Check if candidates exist before reading index '0'
+        
         if (!aiData.candidates || !aiData.candidates[0]) {
-            throw new Error("AI took too long to respond. Please try selecting only 1 platform.");
+            throw new Error("AI Timeout. Try 1 platform.");
         }
 
-        const resultText = aiData.candidates[0].content.parts[0].text;
+        // CLEANING THE TEXT (Removes any accidental markdown or stray characters)
+        let resultText = aiData.candidates[0].content.parts[0].text;
+        resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
 
-        // 3. UPDATE USAGE
+        // 3. UPDATE USAGE & RESPOND
         if (!isPro) {
             await supabase.from('user_usage').update({ usage_count: userData.usage_count + 1 }).ilike('email', cleanEmail);
         }
@@ -79,7 +87,7 @@ const systemInstruction = `You are a Master Content Strategist.
         return res.status(200).json({ 
             results: JSON.parse(resultText), 
             remaining: isPro ? 999 : (userData['Monthly Limit'] - (userData.usage_count + 1)),
-            plan: userData['Membership Plan']
+            plan: currentPlan
         });
 
     } catch (error) {

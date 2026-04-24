@@ -24,8 +24,9 @@ export default async function handler(req, res) {
 
         const currentPlan = userData['Membership Plan'] || 'Essential';
         const isPro = currentPlan === 'Professional';
-        const lengthInst = lengthPreference === 'short' ? "punchy (1-2 paragraphs)" : "deep-dive (3-4 paragraphs)";
-
+        const lengthInst = lengthPreference === 'short' ? "1 paragraph max" : "2 short paragraphs";
+// This reduces the "workload" so the AI can finish all platforms in under 10 seconds.
+        
         // 2. QUALITY AI CALL (Restored Instructions)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         

@@ -51,12 +51,16 @@ export default async function handler(req, res) {
         If 'Newsletter' is selected, use keys: NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
         For others, use: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.`;
 
-        const aiResponse = await fetch(apiUrl, {
+       const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: systemInstruction + `\n\nSource: ${content}` }] }],
-                generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
+                generationConfig: { 
+                    responseMimeType: "application/json", 
+                    temperature: 0.2, // Lower = Faster
+                    maxOutputTokens: 600 // Limits length to stay under the 10s timer
+                }
             })
         });
 

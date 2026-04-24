@@ -62,8 +62,8 @@ export default async function handler(req, res) {
     - NEWSLETTER_SUBJECT (Only if platform is Newsletter)
     - POST_CONTENT (Use <br><br> for paragraph breaks)
     - VISUAL_SUGGESTION
-    - STRATEGIC_HASHTAGS
-    - CALL_TO_ACTION
+    - STRATEGIC_HASHTAGS (High performing but relative to content)
+    - CALL_TO_ACTION (highperforming in creating engagement)
     - NEVER USE EM DASH`;
 
     const aiResponse = await fetch(apiUrl, {

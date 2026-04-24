@@ -12,14 +12,13 @@ export default async function handler(req, res) {
         const { content, platforms, tone, email, lengthPreference } = req.body;
         const cleanEmail = (email || "").toLowerCase().trim();
 
-       // 1. DATABASE CHECK
+        // 1. DATABASE CHECK & SAFETY CATCH
         let { data: userData, error: dbError } = await supabase
             .from('user_usage')
             .select('*')
             .ilike('email', cleanEmail)
             .single();
 
-        // Safety Catch: If user doesn't exist, create them immediately
         if (dbError || !userData) {
             const { data: newUser, error: createError } = await supabase
                 .from('user_usage')
@@ -36,25 +35,16 @@ export default async function handler(req, res) {
             userData = newUser;
         }
 
-        // Now it's safe to read these because we know userData exists
         const currentPlan = userData['Membership Plan']; 
         const isPro = currentPlan === 'Professional';
         const lengthInst = lengthPreference === 'short' ? "1-2 paragraphs" : "3-4 paragraphs";
 
-        // 2. AI CALL (STRICT JSON FORMAT)
+        // 2. AI CALL (STRICT JSON & FAST)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
-const systemInstruction = `You are a Master Content Strategist. 
-        Tone: ${tone}. Output ONLY JSON. 
-        Platforms: ${platforms.join(', ')}. 
-        STRICT: Keep each post under 100 words. No fluff. Use <br><br> for breaks.`;
-
-// 2. AI CALL (STRICT JSON)
         const systemInstruction = `You are a Master Content Strategist. 
-        Tone: ${tone}. Output ONLY a raw JSON object. 
-        No markdown, no backticks, no comments.
-        Keys: ${platforms.join(', ')}.
-        Each value must be a string. 
+        Tone: ${tone}. Length: ${lengthInst}. Output ONLY a raw JSON object. 
+        No markdown, no backticks. Keys: ${platforms.join(', ')}.
         Use <br><br> for breaks.`;
 
         const aiResponse = await fetch(apiUrl, {
@@ -64,7 +54,8 @@ const systemInstruction = `You are a Master Content Strategist.
                 contents: [{ parts: [{ text: systemInstruction + `\n\nMaterial: ${content}` }] }],
                 generationConfig: { 
                     responseMimeType: "application/json", 
-                    temperature: 0.1
+                    temperature: 0.1,
+                    maxOutputTokens: 500
                 }
             })
         });
@@ -75,7 +66,6 @@ const systemInstruction = `You are a Master Content Strategist.
             throw new Error("AI Timeout. Try 1 platform.");
         }
 
-        // CLEANING THE TEXT (Removes any accidental markdown or stray characters)
         let resultText = aiData.candidates[0].content.parts[0].text;
         resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
 
@@ -92,6 +82,6 @@ const systemInstruction = `You are a Master Content Strategist.
 
     } catch (error) {
         console.error("Studio Error:", error);
-        return res.status(500).json({ error: "System snag. Please refresh and try 1 platform." });
+        return res.status(500).json({ error: error.message || "System snag." });
     }
 }

@@ -42,9 +42,10 @@ export default async function handler(req, res) {
         // 2. AI CALL (STRICT JSON & FAST)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
-        const systemInstruction = `You are a Master Content Strategist. 
+       const systemInstruction = `You are a Master Content Strategist. 
         Tone: ${tone}. Length: ${lengthInst}. Output ONLY a raw JSON object. 
         No markdown, no backticks. Keys: ${platforms.join(', ')}.
+        STRICT: Use single quotes (') for any quotes inside the text. 
         Use <br><br> for breaks.`;
 
         const aiResponse = await fetch(apiUrl, {

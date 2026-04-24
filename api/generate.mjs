@@ -45,22 +45,22 @@ export default async function handler(req, res) {
     };
 
     const prompt = `Act as a professional content creator. Convert this text: "${content}" 
-into content for: ${platforms.join(', ')}. 
-Tone: ${tone}. Length: ${lengthPreference}.
-
-STRICT JSON OUTPUT FORMAT:
-{
-  "results": {
-    "Platform_Name": {
-      "Hook": "One punchy line",
-      "Caption": "Multiple paragraphs of body text. Use \\n\\n between paragraphs for spacing.",
-      "CTA": "High-engaging Call to Action",
-      "Hashtags": "Trending hashtags (OMIT for Newsletter)",
-      "Image_Suggestion": "Visual prompt (OMIT for Newsletter)",
-      "Subject_Line": "Subject wording (ONLY for Newsletter)"
-    }
-  }
-}`;
+    into content for: ${platforms.join(', ')}. 
+    Tone: ${tone}. Length: ${lengthPreference}.
+    
+    STRICT JSON OUTPUT FORMAT:
+    {
+      "results": {
+        "Platform_Name": {
+          "Hook": "Catchy first line",
+          "Caption": "Main body text content with \\n\\n for paragraphs",
+          "CTA": "High-engaging Call to Action",
+          "Hashtags": "Trending hashtags (OMIT for Newsletter)",
+          "Image_Suggestion": "Visual prompt (OMIT for Newsletter)",
+          "Subject_Line": "Subject wording (ONLY for Newsletter)"
+        }
+      }
+    }`;
 
     try {
       // Primary Attempt: Gemini 3
@@ -70,7 +70,7 @@ STRICT JSON OUTPUT FORMAT:
     } catch (primaryError) {
       console.warn("Gemini 3 Busy, falling back to Gemini 1.5...");
       
-      // Secondary Attempt: Gemini 1.5 Flash (Much higher availability)
+      // Secondary Attempt: Fixed model string for 1.5 Flash
       const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash", ...modelConfig });
       const result = await model15.generateContent(prompt);
       aiData = JSON.parse(result.response.text());

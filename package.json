@@ -1,9 +1,9 @@
 {
-  "type": "module",
-  "name": "calm-content-studio",
+  "name": "calm-content-studio-backend",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.0.0",
-    "node-fetch": "^3.0.0"
+    "@google/generative-ai": "^0.21.0",
+    "@supabase/supabase-js": "^2.43.0"
   }
 }

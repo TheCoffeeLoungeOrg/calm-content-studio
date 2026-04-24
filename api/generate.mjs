@@ -30,11 +30,16 @@ export default async function handler(req, res) {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
         // We explicitly define the keys so the HTML can find them
-        const systemInstruction = `You are a Master Content Strategist. Tone: ${tone}. 
-        Output ONLY a JSON object. 
-        Keys MUST be: "POST_CONTENT", "VISUAL_SUGGESTION", "STRATEGIC_HASHTAGS", "CALL_TO_ACTION".
-        STRICT: Use single quotes (') for all speech. No double quotes (") inside values.
-        Use <br><br> for breaks.`;
+        const systemInstruction = `You are a Master Content Strategist. 
+        Tone: ${tone}. Output ONLY a JSON object.
+        You MUST use this EXACT structure:
+        {
+          "POST_CONTENT": "Your main content here...",
+          "VISUAL_SUGGESTION": "Image idea here...",
+          "STRATEGIC_HASHTAGS": "#tags here...",
+          "CALL_TO_ACTION": "Link or prompt here..."
+        }
+        STRICT: Do not add any other keys. Use <br><br> for breaks.`;
 
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',

@@ -45,10 +45,10 @@ export default async function handler(req, res) {
     }
 
     const lengthInstruction = lengthPreference === 'short' 
-      ? "Keep content punchy (1-2 paragraphs)." 
-      : "Provide a deep-dive (3-4 paragraphs).";
+      ? "Keep content punchy (1 paragraph)." 
+      : "Provide a deep-dive (2 compact paragraphs).";
 
-    // 3. AI CALL - FIXING THE SYNTAX ERROR HERE
+    // 3. AI CALL
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
     const systemInstruction = `You are a Master Content Strategist.

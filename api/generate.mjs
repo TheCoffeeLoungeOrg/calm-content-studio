@@ -3,77 +3,64 @@ import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
-    // 1. STICKY HEADERS FOR STABILITY
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        const { content, platforms, tone, email } = req.body;
+        const { content, platforms, tone, email, lengthPreference } = req.body;
         const cleanEmail = (email || "").toLowerCase().trim();
 
-        // 2. DATABASE CHECK - Find or Create User (Combined into one step)
-        let { data: userData, error: dbError } = await supabase
-            .from('user_usage')
-            .select('*')
-            .ilike('email', cleanEmail)
-            .single();
-
+        // 1. DATABASE CHECK (Recognizes Professional Plan)
+        let { data: userData } = await supabase.from('user_usage').select('*').ilike('email', cleanEmail).single();
+        
         if (!userData) {
             const { data: newUser } = await supabase.from('user_usage').insert([{
-                email: cleanEmail,
-                usage_count: 0,
-                'Monthly Limit': 20,
-                'Membership Plan': 'Essential'
+                email: cleanEmail, usage_count: 0, 'Monthly Limit': 20, 'Membership Plan': 'Essential'
             }]).select().single();
             userData = newUser;
         }
 
-        if (!userData) throw new Error("User record unavailable");
-
-        // 3. MAP DATABASE FIELDS (Matches your Supabase screenshot)
         const currentPlan = userData['Membership Plan'] || 'Essential';
-        const currentUsage = userData.usage_count || 0;
-        const monthlyLimit = userData['Monthly Limit'] || 20;
+        const isPro = currentPlan === 'Professional';
+        const lengthInst = lengthPreference === 'short' ? "punchy (1-2 paragraphs)" : "deep-dive (3-4 paragraphs)";
 
-        // 4. AI CALL (Optimized for speed)
+        // 2. QUALITY AI CALL (Restored Instructions)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
+        const systemInstruction = `You are a Master Content Strategist. Tone: "${tone}". Length: ${lengthInst}. 
+        STRICT RULES:
+        1. Output ONLY a valid JSON object. No markdown.
+        2. Newsletter: Use keys NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION. (No hashtags).
+        3. Others: Use keys POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.
+        4. Use <br><br> for paragraph breaks. No em-dashes.
+        Platforms: ${platforms.join(', ')}.`;
+
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: `Social Media Marketer. Tone: ${tone}. Create content for ${platforms.join(', ')} from this text: ${content}. Return JSON only.` }] }],
-                generationConfig: { 
-                    responseMimeType: "application/json", 
-                    temperature: 0.2, 
-                    maxOutputTokens: 800 
-                }
+                contents: [{ parts: [{ text: systemInstruction + `\n\nSource Material: ${content}` }] }],
+                generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
             })
         });
 
         const aiData = await aiResponse.json();
-        if (aiData.error) throw new Error("AI Timeout or Error");
-        
         const resultText = aiData.candidates[0].content.parts[0].text;
 
-        // 5. UPDATE USAGE IF NOT PROFESSIONAL
-        if (currentPlan !== 'Professional') {
-            await supabase.from('user_usage')
-                .update({ usage_count: currentUsage + 1 })
-                .ilike('email', cleanEmail);
+        // 3. UPDATE USAGE
+        if (!isPro) {
+            await supabase.from('user_usage').update({ usage_count: userData.usage_count + 1 }).ilike('email', cleanEmail);
         }
 
-        // 6. RETURN FINAL RESULTS
         return res.status(200).json({ 
             results: JSON.parse(resultText), 
-            remaining: currentPlan === 'Professional' ? 999 : (monthlyLimit - (currentUsage + 1)),
+            remaining: isPro ? 999 : (userData['Monthly Limit'] - (userData.usage_count + 1)),
             plan: currentPlan
         });
 
     } catch (error) {
-        console.error("CRITICAL ERROR:", error.message);
-        return res.status(500).json({ error: "The Studio encountered a snag. Please refresh and try again." });
+        return res.status(500).json({ error: "The Studio is stabilizing. Please try again in a moment." });
     }
 }

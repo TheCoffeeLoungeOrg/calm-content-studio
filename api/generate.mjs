@@ -51,20 +51,21 @@ export default async function handler(req, res) {
     // 3. AI CALL - STRENGTHENED INSTRUCTIONS
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
-    const systemInstruction = `You are a professional content creator. 
+    const systemInstruction = `You are a professional JSON generator.
     Tone: "${tone}". ${lengthInstruction}
     Today's date is ${dateString}. 
 
-    REQUIRED: Return a SINGLE JSON object only. 
-    NO markdown, NO backticks, NO numbering (e.g., do not use 1., 2., 3.).
-
-    Each platform in ${platforms.join(', ')} must have these EXACT keys:
-    - NEWSLETTER_SUBJECT (Only if platform is Newsletter)
-    - POST_CONTENT (Use <br><br> for paragraph breaks)
-    - VISUAL_SUGGESTION
-    - STRATEGIC_HASHTAGS (High performing but relative to content)
-    - CALL_TO_ACTION (highperforming in creating engagement)
-    - NEVER USE EM DASH`;
+    STRICT JSON RULES:
+    1. Return ONLY a single JSON object. No markdown, no backticks.
+    2. Do NOT use numbers (1., 2., 3.) before any labels or content.
+    3. For the "Newsletter" platform:
+       - DO NOT provide VISUAL_SUGGESTION.
+       - DO NOT provide STRATEGIC_HASHTAGS.
+       - Provide 3 subject line options in NEWSLETTER_SUBJECT separated by <br>.
+    4. For all other platforms:
+       - Provide POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, and CALL_TO_ACTION.
+    
+    Target Platforms: ${platforms.join(', ')}`;
 
     const aiResponse = await fetch(apiUrl, {
       method: 'POST',

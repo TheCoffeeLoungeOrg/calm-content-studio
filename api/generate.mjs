@@ -12,9 +12,8 @@ export default async function handler(req, res) {
         const { content, platforms, tone, email, lengthPreference } = req.body;
         const cleanEmail = (email || "").toLowerCase().trim();
 
-        // 1. DATABASE CHECK (Recognizes Professional Plan)
+        // 1. DATABASE CHECK
         let { data: userData } = await supabase.from('user_usage').select('*').ilike('email', cleanEmail).single();
-        
         if (!userData) {
             const { data: newUser } = await supabase.from('user_usage').insert([{
                 email: cleanEmail, usage_count: 0, 'Monthly Limit': 20, 'Membership Plan': 'Essential'
@@ -22,27 +21,24 @@ export default async function handler(req, res) {
             userData = newUser;
         }
 
-        const currentPlan = userData['Membership Plan'] || 'Essential';
-        const isPro = currentPlan === 'Professional';
-        const lengthInst = lengthPreference === 'short' ? "1 paragraph max" : "2 short paragraphs";
-// This reduces the "workload" so the AI can finish all platforms in under 10 seconds.
-        
-        // 2. QUALITY AI CALL (Restored Instructions)
+        const isPro = userData['Membership Plan'] === 'Professional';
+        const lengthInst = lengthPreference === 'short' ? "1-2 paragraphs" : "3-4 paragraphs";
+
+        // 2. AI CALL (STRICT JSON FORMAT)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
-       const systemInstruction = `You are a Expert Digital Marketing Strategist. 
-Output ONLY a JSON object. NO ARRAYS. 
-Keys must be exactly: "Facebook Page", "Facebook Group", "Instagram", "Pinterest", "LinkedIn", "TikTok", "Newsletter".
-DO NOT wrap the response in an array []. Return only the object {}.
-4. Newsletter: Use keys NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
-5. Others: Use keys POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.
-6. Use <br><br> for paragraph breaks.Never use em dash.  Attempt to sound as human as you can`;
-        
+        const systemInstruction = `You are a Master Content Strategist. 
+        Tone: ${tone}. Length: ${lengthInst}. Paragraph breaks: <br><br>.
+        Output ONLY a JSON object. NO markdown, NO arrays.
+        Keys MUST be exactly from this list: ${platforms.join(', ')}.
+        If 'Newsletter' is selected, use keys: NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
+        For others, use: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.`;
+
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: systemInstruction + `\n\nSource Material: ${content}` }] }],
+                contents: [{ parts: [{ text: systemInstruction + `\n\nSource: ${content}` }] }],
                 generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
             })
         });
@@ -58,10 +54,11 @@ DO NOT wrap the response in an array []. Return only the object {}.
         return res.status(200).json({ 
             results: JSON.parse(resultText), 
             remaining: isPro ? 999 : (userData['Monthly Limit'] - (userData.usage_count + 1)),
-            plan: currentPlan
+            plan: userData['Membership Plan']
         });
 
     } catch (error) {
-        return res.status(500).json({ error: "The Studio is stabilizing. Please try again in a moment." });
+        console.error("Studio Error:", error);
+        return res.status(500).json({ error: "System snag. Please refresh and try 1 platform." });
     }
 }

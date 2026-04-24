@@ -42,10 +42,12 @@ export default async function handler(req, res) {
     }
 
     // 2. AI Generation
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
-    });
+const model = genAI.getGenerativeModel({ 
+  model: "gemini-3-flash-preview", // Updated to the exact preview string
+  generationConfig: { 
+    responseMimeType: "application/json" 
+  }
+});
 
     const prompt = `Act as a professional content strategist. 
     Topic: ${content}

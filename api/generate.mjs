@@ -10,7 +10,26 @@ export default async function handler(req, res) {
 
     try {
         const { content, platforms, tone, email } = req.body;
-        const cleanEmail = (email || "").toLowerCase().trim();
+        // 1. DATABASE CHECK (The "Find Me" Logic)
+    const cleanEmail = (email || "").toLowerCase().trim();
+    
+    // We use .ilike to ignore capital letters
+    let { data: user, error: dbError } = await supabase
+      .from('user_usage')
+      .select('*')
+      .ilike('email', cleanEmail) 
+      .single();
+
+    // If still not found, we create a basic entry to prevent a crash
+    if (!user) {
+        const { data: newUser } = await supabase.from('user_usage').insert([{ 
+          email: cleanEmail, 
+          usage_count: 0, 
+          monthly_limit: 20, 
+          membership_plan: 'Essential' 
+        }]).select().single();
+        user = newUser;
+    }
 
         // 1. FASTEST DB FETCH
         const { data: user } = await supabase.from('user_usage').select('membership_plan, usage_count, monthly_limit').ilike('email', cleanEmail).single();

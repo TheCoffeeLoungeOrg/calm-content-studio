@@ -12,16 +12,33 @@ export default async function handler(req, res) {
         const { content, platforms, tone, email, lengthPreference } = req.body;
         const cleanEmail = (email || "").toLowerCase().trim();
 
-        // 1. DATABASE CHECK
-        let { data: userData } = await supabase.from('user_usage').select('*').ilike('email', cleanEmail).single();
-        if (!userData) {
-            const { data: newUser } = await supabase.from('user_usage').insert([{
-                email: cleanEmail, usage_count: 0, 'Monthly Limit': 20, 'Membership Plan': 'Essential'
-            }]).select().single();
+       // 1. DATABASE CHECK
+        let { data: userData, error: dbError } = await supabase
+            .from('user_usage')
+            .select('*')
+            .ilike('email', cleanEmail)
+            .single();
+
+        // Safety Catch: If user doesn't exist, create them immediately
+        if (dbError || !userData) {
+            const { data: newUser, error: createError } = await supabase
+                .from('user_usage')
+                .insert([{
+                    email: cleanEmail,
+                    usage_count: 0,
+                    'Monthly Limit': 20,
+                    'Membership Plan': 'Essential'
+                }])
+                .select()
+                .single();
+            
+            if (createError) throw new Error("Database creation failed");
             userData = newUser;
         }
 
-        const isPro = userData['Membership Plan'] === 'Professional';
+        // Now it's safe to read these because we know userData exists
+        const currentPlan = userData['Membership Plan']; 
+        const isPro = currentPlan === 'Professional';
         const lengthInst = lengthPreference === 'short' ? "1-2 paragraphs" : "3-4 paragraphs";
 
         // 2. AI CALL (STRICT JSON FORMAT)

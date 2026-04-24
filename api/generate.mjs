@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     const cleanEmail = (email || "").toLowerCase().trim();
     if (!cleanEmail) return res.status(400).json({ error: "Email is required" });
 
-    let { data: user, error: dbError } = await supabase
+    let { data: user } = await supabase
       .from('user_usage')
       .select('*')
       .ilike('email', cleanEmail) 
@@ -48,20 +48,33 @@ export default async function handler(req, res) {
       ? "Keep content punchy (1-2 paragraphs)." 
       : "Provide a deep-dive (3-4 paragraphs).";
 
-    // 3. AI CALL
+    // 3. AI CALL - STRENGTHENED INSTRUCTIONS
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
-    const systemInstruction = `Act as a master content strategist. Tone: "${tone}". ${lengthInstruction}
-    Today is ${dateString}. Generate JSON content for: ${platforms.join(', ')}. 
-    Format: Each platform needs NEWSLETTER_SUBJECT (if Newsletter), POST_CONTENT (use <br><br>), VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION. 
-    Return ONLY valid JSON. No markdown.`;
+    const systemInstruction = `You are a professional content creator. 
+    Tone: "${tone}". ${lengthInstruction}
+    Today's date is ${dateString}. 
+
+    REQUIRED: Return a SINGLE JSON object only. 
+    NO markdown, NO backticks, NO numbering (e.g., do not use 1., 2., 3.).
+
+    Each platform in ${platforms.join(', ')} must have these EXACT keys:
+    - NEWSLETTER_SUBJECT (Only if platform is Newsletter)
+    - POST_CONTENT (Use <br><br> for paragraph breaks)
+    - VISUAL_SUGGESTION
+    - STRATEGIC_HASHTAGS
+    - CALL_TO_ACTION
+    - NEVER USE EM DASH`;
 
     const aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: systemInstruction + `\n\nInput Source Material: "${content}"` }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
+        generationConfig: { 
+            responseMimeType: "application/json", 
+            temperature: 0.7 
+        }
       })
     });
 
@@ -70,7 +83,6 @@ export default async function handler(req, res) {
 
     // CLEANING THE JSON
     let resultText = aiData.candidates[0].content.parts[0].text;
-    // Remove markdown code blocks if AI accidentally included them
     resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
 
     // 4. SMART CREDIT DEDUCTION
@@ -91,6 +103,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Studio Error:", error);
-    return res.status(500).json({ error: "The Studio encountered a snag. Try again in a moment!" });
+    return res.status(500).json({ error: "The Studio encountered a snag. Try again!" });
   }
 }

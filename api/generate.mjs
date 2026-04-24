@@ -38,11 +38,11 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Monthly credit limit reached.' });
     }
 
-   // 3. Gemini 3 Generation (Updated Prompt for extra features)
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-3-flash-preview", 
+   // 3. AI Generation with Fallback Logic
+    let aiData;
+    const modelConfig = { 
       generationConfig: { responseMimeType: "application/json" }
-    });
+    };
 
     const prompt = `Act as a professional content creator. Convert this text: "${content}" 
     into content for: ${platforms.join(', ')}. 
@@ -55,17 +55,26 @@ export default async function handler(req, res) {
           "Hook": "Catchy first line",
           "Caption": "Main body text content",
           "CTA": "High-engaging Call to Action",
-          "Hashtags": "Trending, relevant hashtags (OMIT for Newsletter)",
-          "Image_Suggestion": "Descriptive prompt for a visual (OMIT for Newsletter)",
-          "Subject_Line": "Compelling subject wording (ONLY for Newsletter)"
+          "Hashtags": "Trending hashtags (OMIT for Newsletter)",
+          "Image_Suggestion": "Visual prompt (OMIT for Newsletter)",
+          "Subject_Line": "Subject wording (ONLY for Newsletter)"
         }
       }
+    }`;
+
+    try {
+      // Primary Attempt: Gemini 3
+      const model3 = genAI.getGenerativeModel({ model: "gemini-3-flash-preview", ...modelConfig });
+      const result = await model3.generateContent(prompt);
+      aiData = JSON.parse(result.response.text());
+    } catch (primaryError) {
+      console.warn("Gemini 3 Busy, falling back to Gemini 1.5...");
+      
+      // Secondary Attempt: Gemini 1.5 Flash (Much higher availability)
+      const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash", ...modelConfig });
+      const result = await model15.generateContent(prompt);
+      aiData = JSON.parse(result.response.text());
     }
-
-    Note: Use \\n for line breaks. Ensure the Newsletter version feels personal and deep.`;
-
-    const result = await model.generateContent(prompt);
-    const aiData = JSON.parse(result.response.text());
 
     // 4. Update Database (Increment)
     const newCount = usage + 1;

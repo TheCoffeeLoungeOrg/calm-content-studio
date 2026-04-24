@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Monthly credit limit reached.' });
     }
 
-    // 3. Gemini 3 Generation
+   // 3. Gemini 3 Generation (Updated Prompt for extra features)
     const model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
       generationConfig: { responseMimeType: "application/json" }
@@ -52,11 +52,17 @@ export default async function handler(req, res) {
     {
       "results": {
         "Platform_Name": {
-          "Caption": "text here",
-          "Hook": "text here"
+          "Hook": "Catchy first line",
+          "Caption": "Main body text content",
+          "CTA": "High-engaging Call to Action",
+          "Hashtags": "Trending, relevant hashtags (OMIT for Newsletter)",
+          "Image_Suggestion": "Descriptive prompt for a visual (OMIT for Newsletter)",
+          "Subject_Line": "Compelling subject wording (ONLY for Newsletter)"
         }
       }
-    }`;
+    }
+
+    Note: Use \\n for line breaks. Ensure the Newsletter version feels personal and deep.`;
 
     const result = await model.generateContent(prompt);
     const aiData = JSON.parse(result.response.text());

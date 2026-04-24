@@ -30,11 +30,10 @@ export default async function handler(req, res) {
         // 2. QUALITY AI CALL (Restored Instructions)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
-       const systemInstruction = `You are a Master Content Strategist. Tone: "${tone}". Length: ${lengthInst}. 
-STRICT RULES:
-1. Output ONLY a valid JSON object. No markdown, no backticks.
-2. Use the platform name EXACTLY as the key (e.g., "Facebook Page", "Instagram").
-3. DO NOT wrap the response in an array []. Return only the object {}.
+       const systemInstruction = `You are a Expert Digital Marketing Strategist. 
+Output ONLY a JSON object. NO ARRAYS. 
+Keys must be exactly: "Facebook Page", "Facebook Group", "Instagram", "Pinterest", "LinkedIn", "TikTok", "Newsletter".
+DO NOT wrap the response in an array []. Return only the object {}.
 4. Newsletter: Use keys NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
 5. Others: Use keys POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.
 6. Use <br><br> for paragraph breaks.Never use em dash.  Attempt to sound as human as you can`;

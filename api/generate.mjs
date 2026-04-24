@@ -1,16 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Supabase with the exact key from your Vercel screenshot
+// 1. Initialize Clients
 const supabase = createClient(
   process.env.SUPABASE_URL, 
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
-  // Set CORS headers for Payhip
+  // CORS Headers (Crucial for Payhip)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -21,7 +20,7 @@ export default async function handler(req, res) {
   const { email, content, tone, platforms, lengthPreference } = req.body;
 
   try {
-    // 1. Fetch User Data
+    // 2. Database Credit Check
     const { data: user, error } = await supabase
       .from('user_usage')
       .select('*')
@@ -29,53 +28,54 @@ export default async function handler(req, res) {
       .single();
 
     if (error || !user) {
-      console.error("Supabase Lookup Error:", error);
-      return res.status(403).json({ error: 'Membership email not found in our records.' });
+      return res.status(403).json({ error: 'Membership email not found.' });
     }
     
-    // Note: JS uses bracket notation for column names with spaces
-    const limit = parseInt(user['Monthly Limit'] || 0);
-    const usage = parseInt(user['usage_count'] || 0);
+    const limit = parseInt(user['Monthly Limit']);
+    const usage = parseInt(user.usage_count);
 
     if (usage >= limit) {
       return res.status(403).json({ error: 'Monthly credit limit reached.' });
     }
 
-    // 2. AI Generation
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-3-flash-preview", // Updated to the exact preview string
-  generationConfig: { 
-    responseMimeType: "application/json" 
-  }
-});
+    // 3. Gemini 3 Generation
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-3-flash-preview", 
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
-    const prompt = `Act as a professional content strategist. 
-    Topic: ${content}
-    Tone: ${tone}
-    Target Platforms: ${platforms.join(', ')}
-    Length: ${lengthPreference}
+    const prompt = `Act as a professional content creator. Convert this text: "${content}" 
+    into content for: ${platforms.join(', ')}. 
+    Tone: ${tone}. Length: ${lengthPreference}.
     
-    Return a JSON object where each key is the Platform name and each value is an object containing "Caption" and "Hook". Use \\n for line breaks.`;
+    STRICT JSON OUTPUT FORMAT:
+    {
+      "results": {
+        "Platform_Name": {
+          "Caption": "text here",
+          "Hook": "text here"
+        }
+      }
+    }`;
 
     const result = await model.generateContent(prompt);
     const aiData = JSON.parse(result.response.text());
 
-    // 3. Update Usage (Atomic Increment)
+    // 4. Update Database (Increment)
     const newCount = usage + 1;
-    await supabase
-      .from('user_usage')
+    await supabase.from('user_usage')
       .update({ usage_count: newCount, last_used: new Date().toISOString() })
       .eq('email', email);
 
-    // 4. Send Response to Payhip Frontend
+    // 5. Send Success Response
     return res.status(200).json({
-      results: aiData, // This sends the object directly to your loop
+      results: aiData.results,
       remaining: limit - newCount,
       plan: user['Membership Plan'] || 'Essential'
     });
 
   } catch (err) {
-    console.error("Server Error:", err);
-    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    console.error("Vercel Execution Error:", err);
+    return res.status(500).json({ error: 'Studio error. Check console for model availability.' });
   }
 }

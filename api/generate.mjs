@@ -24,10 +24,10 @@ export default async function handler(req, res) {
         // 2. AI CALL (FORCED STABILITY)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
-        const systemInstruction = `You are a Master Content Strategist. Tone: ${tone}. 
-        Output ONLY a JSON object. No markdown. No backticks. 
-        STRICT: Use single quotes (') for all speech. NEVER use double quotes (") inside a value. 
-        Keys: ${platforms.join(', ')}. Use <br><br> for breaks.`;
+        const systemInstruction = `You are a Master Content Strategist. Tone: ${tone}.
+        Output ONLY a JSON object with these EXACT keys: 
+        "POST_CONTENT", "VISUAL_SUGGESTION", "STRATEGIC_HASHTAGS", "CALL_TO_ACTION".
+        STRICT: Do not use any other keys. Use <br><br> for breaks.`;
 
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',

@@ -48,32 +48,26 @@ export default async function handler(req, res) {
       ? "Keep content punchy (1-2 paragraphs)." 
       : "Provide a deep-dive (3-4 paragraphs).";
 
-    // 3. AI CALL - STRENGTHENED INSTRUCTIONS
+    // 3. AI CALL - FIXING THE SYNTAX ERROR HERE
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
-    const systemInstruction = `You are a Master Content Strategist and Digital Marketer.
+    const systemInstruction = `You are a Master Content Strategist.
     Tone: "${tone}". ${lengthInstruction}
-    Today's date is ${dateString}. 
+    Today's date: ${dateString}. 
 
-    YOUR MISSION: 
-    Transform the source material into high-converting posts for: ${platforms.join(', ')}.
-
-    STRICT FORMATTING RULES:
+    RULES:
     1. Output MUST be a single, valid JSON object.
-    2. Use the platform names as the ONLY top-level keys. 
-    3. No markdown, no backticks, no numbering (1., 2., 3.).
-    4. For "Newsletter": Provide NEWSLETTER_SUBJECT, POST_CONTENT, and CALL_TO_ACTION. (Strictly NO hashtags or visuals).
-    5. For all others: Provide POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, and CALL_TO_ACTION.
-    6. Use <br><br> for paragraph breaks.
-    7. NEVER USE EM DASH. Content must have a human sound to it.`;
-    
-    Target Platforms: ${platforms.join(', ')}`;
+    2. Use platform names as the ONLY top-level keys: ${platforms.join(', ')}. 
+    3. No markdown, no backticks, no numbering.
+    4. Newsletter: Only NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
+    5. Others: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.
+    6. Use <br><br> for breaks. No em-dashes.`;
 
     const aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: systemInstruction + `\n\nInput Source Material: "${content}"` }] }],
+        contents: [{ parts: [{ text: systemInstruction + `\n\nInput Source: "${content}"` }] }],
         generationConfig: { 
             responseMimeType: "application/json", 
             temperature: 0.7 
@@ -84,7 +78,6 @@ export default async function handler(req, res) {
     const aiData = await aiResponse.json();
     if (aiData.error) return res.status(500).json({ error: "AI Error: " + aiData.error.message });
 
-    // CLEANING THE JSON
     let resultText = aiData.candidates[0].content.parts[0].text;
     resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
 

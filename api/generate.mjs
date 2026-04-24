@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
+    // 1. STICKY HEADERS FOR STABILITY
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -10,62 +11,69 @@ export default async function handler(req, res) {
 
     try {
         const { content, platforms, tone, email } = req.body;
-        // 1. DATABASE CHECK (The "Find Me" Logic)
-    const cleanEmail = (email || "").toLowerCase().trim();
-    
-    // We use .ilike to ignore capital letters
-    let { data: user, error: dbError } = await supabase
-      .from('user_usage')
-      .select('*')
-      .ilike('email', cleanEmail) 
-      .single();
+        const cleanEmail = (email || "").toLowerCase().trim();
 
-    // If still not found, we create a basic entry to prevent a crash
-    if (!user) {
-        const { data: newUser } = await supabase.from('user_usage').insert([{ 
-          email: cleanEmail, 
-          usage_count: 0, 
-          monthly_limit: 20, 
-          membership_plan: 'Essential' 
-        }]).select().single();
-        user = newUser;
-    }
+        // 2. DATABASE CHECK - Find or Create User (Combined into one step)
+        let { data: userData, error: dbError } = await supabase
+            .from('user_usage')
+            .select('*')
+            .ilike('email', cleanEmail)
+            .single();
 
-        // 1. FASTEST DB FETCH
-        const { data: user } = await supabase.from('user_usage').select('membership_plan, usage_count, monthly_limit').ilike('email', cleanEmail).single();
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!userData) {
+            const { data: newUser } = await supabase.from('user_usage').insert([{
+                email: cleanEmail,
+                usage_count: 0,
+                'Monthly Limit': 20,
+                'Membership Plan': 'Essential'
+            }]).select().single();
+            userData = newUser;
+        }
 
-        // 2. ULTRALIGHT AI CALL
+        if (!userData) throw new Error("User record unavailable");
+
+        // 3. MAP DATABASE FIELDS (Matches your Supabase screenshot)
+        const currentPlan = userData['Membership Plan'] || 'Essential';
+        const currentUsage = userData.usage_count || 0;
+        const monthlyLimit = userData['Monthly Limit'] || 20;
+
+        // 4. AI CALL (Optimized for speed)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: `Social Media Expert. Tone: ${tone}. Create content for ${platforms.join(', ')} based on this text: ${content}. Return JSON only.` }] }],
+                contents: [{ parts: [{ text: `Social Media Marketer. Tone: ${tone}. Create content for ${platforms.join(', ')} from this text: ${content}. Return JSON only.` }] }],
                 generationConfig: { 
                     responseMimeType: "application/json", 
-                    temperature: 0.1, // Less "creative thinking" = Faster response
-                    maxOutputTokens: 600 // Shortest possible length to beat the timer
+                    temperature: 0.2, 
+                    maxOutputTokens: 800 
                 }
             })
         });
 
         const aiData = await aiResponse.json();
+        if (aiData.error) throw new Error("AI Timeout or Error");
+        
         const resultText = aiData.candidates[0].content.parts[0].text;
 
-        // 3. SILENT UPDATE
-        if (user.membership_plan !== 'Professional') {
-            await supabase.from('user_usage').update({ usage_count: user.usage_count + 1 }).ilike('email', cleanEmail);
+        // 5. UPDATE USAGE IF NOT PROFESSIONAL
+        if (currentPlan !== 'Professional') {
+            await supabase.from('user_usage')
+                .update({ usage_count: currentUsage + 1 })
+                .ilike('email', cleanEmail);
         }
 
+        // 6. RETURN FINAL RESULTS
         return res.status(200).json({ 
             results: JSON.parse(resultText), 
-            remaining: user.membership_plan === 'Professional' ? 999 : (user.monthly_limit - (user.usage_count + 1)),
-            plan: user.membership_plan
+            remaining: currentPlan === 'Professional' ? 999 : (monthlyLimit - (currentUsage + 1)),
+            plan: currentPlan
         });
 
     } catch (error) {
-        return res.status(500).json({ error: "Network lag detected. Try turning off your VPN for a moment." });
+        console.error("CRITICAL ERROR:", error.message);
+        return res.status(500).json({ error: "The Studio encountered a snag. Please refresh and try again." });
     }
 }

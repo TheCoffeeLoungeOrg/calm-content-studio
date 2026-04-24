@@ -26,27 +26,22 @@ export default async function handler(req, res) {
             userData = newUser;
         }
 
-        // 2. AI CALL (STRICT KEY MAPPING)
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        
-        // We explicitly define the keys so the HTML can find them
-        const systemInstruction = `You are a Master Content Strategist. 
-        Tone: ${tone}. Output ONLY a JSON object.
-        You MUST use this EXACT structure:
-        {
-          "POST_CONTENT": "Your main content here...",
-          "VISUAL_SUGGESTION": "Image idea here...",
-          "STRATEGIC_HASHTAGS": "#tags here...",
-          "CALL_TO_ACTION": "Link or prompt here..."
-        }
-        STRICT: Do not add any other keys. Use <br><br> for breaks.`;
+// 2. AI CALL (STRICT & FAST)
+        const systemInstruction = `You are a Master Content Strategist. Tone: ${tone}. 
+        Output ONLY a JSON object. 
+        Keys: "POST_CONTENT", "VISUAL_SUGGESTION", "STRATEGIC_HASHTAGS", "CALL_TO_ACTION".
+        STRICT: Under 150 words total. No fluff. Use <br><br> for breaks.`;
 
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: systemInstruction + `\n\nMaterial: ${content}` }] }],
-                generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+                generationConfig: { 
+                    responseMimeType: "application/json", 
+                    temperature: 0.1, // Makes the AI faster and more direct
+                    maxOutputTokens: 400 // Limits length to stay under the 10s timer
+                }
             })
         });
 

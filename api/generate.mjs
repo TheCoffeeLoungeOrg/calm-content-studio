@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Monthly credit limit reached.' });
     }
 
-   // 3. AI Generation with Fallback Logic
+  // 3. AI Generation with Fallback Logic
     let aiData;
     const modelConfig = { 
       generationConfig: { responseMimeType: "application/json" }
@@ -70,8 +70,8 @@ export default async function handler(req, res) {
     } catch (primaryError) {
       console.warn("Gemini 3 Busy, falling back to Gemini 1.5...");
       
-      // Secondary Attempt: Fixed model string for 1.5 Flash
-      const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash", ...modelConfig });
+      // Secondary Attempt: Gemini 1.5 Flash (using the latest stable alias)
+      const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", ...modelConfig });
       const result = await model15.generateContent(prompt);
       aiData = JSON.parse(result.response.text());
     }

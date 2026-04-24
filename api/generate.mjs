@@ -44,23 +44,20 @@ export default async function handler(req, res) {
         // 2. AI CALL (STRICT JSON FORMAT)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         
-        const systemInstruction = `You are a Master Content Strategist. 
-        Tone: ${tone}. Length: ${lengthInst}. Paragraph breaks: <br><br>.
-        Output ONLY a JSON object. NO markdown, NO arrays.
-        Keys MUST be exactly from this list: ${platforms.join(', ')}.
-        If 'Newsletter' is selected, use keys: NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
-        For others, use: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.`;
+const systemInstruction = `You are a Master Content Strategist. 
+        Tone: ${tone}. Output ONLY JSON. 
+        Platforms: ${platforms.join(', ')}. 
+        STRICT: Keep each post under 100 words. No fluff. Use <br><br> for breaks.`;
 
-       // 2. AI CALL (Optimized for 10-second Vercel Limit)
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: systemInstruction + `\n\nSource: ${content}` }] }],
+                contents: [{ parts: [{ text: systemInstruction + `\n\nMaterial: ${content}` }] }],
                 generationConfig: { 
                     responseMimeType: "application/json", 
-                    temperature: 0.1, // Lower temperature = faster processing
-                    maxOutputTokens: 500 // Keeps response short to beat the timer
+                    temperature: 0.1, 
+                    maxOutputTokens: 400 // Shorter = Much Faster
                 }
             })
         });

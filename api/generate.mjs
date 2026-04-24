@@ -51,19 +51,21 @@ export default async function handler(req, res) {
     // 3. AI CALL - STRENGTHENED INSTRUCTIONS
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
-    const systemInstruction = `You are a professional JSON generator.
+    const systemInstruction = `You are a Master Content Strategist and Digital Marketer.
     Tone: "${tone}". ${lengthInstruction}
     Today's date is ${dateString}. 
 
-    STRICT JSON RULES:
-    1. Return ONLY a single JSON object. No markdown, no backticks.
-    2. Do NOT use numbers (1., 2., 3.) before any labels or content.
-    3. For the "Newsletter" platform:
-       - DO NOT provide VISUAL_SUGGESTION.
-       - DO NOT provide STRATEGIC_HASHTAGS.
-       - Provide 3 subject line options in NEWSLETTER_SUBJECT separated by <br>.
-    4. For all other platforms:
-       - Provide POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, and CALL_TO_ACTION.
+    YOUR MISSION: 
+    Transform the source material into high-converting posts for: ${platforms.join(', ')}.
+
+    STRICT FORMATTING RULES:
+    1. Output MUST be a single, valid JSON object.
+    2. Use the platform names as the ONLY top-level keys. 
+    3. No markdown, no backticks, no numbering (1., 2., 3.).
+    4. For "Newsletter": Provide NEWSLETTER_SUBJECT, POST_CONTENT, and CALL_TO_ACTION. (Strictly NO hashtags or visuals).
+    5. For all others: Provide POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, and CALL_TO_ACTION.
+    6. Use <br><br> for paragraph breaks.
+    7. NEVER USE EM DASH. Content must have a human sound to it.`;
     
     Target Platforms: ${platforms.join(', ')}`;
 

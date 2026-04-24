@@ -51,20 +51,27 @@ export default async function handler(req, res) {
         If 'Newsletter' is selected, use keys: NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
         For others, use: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.`;
 
-       const aiResponse = await fetch(apiUrl, {
+       // 2. AI CALL (Optimized for 10-second Vercel Limit)
+        const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: systemInstruction + `\n\nSource: ${content}` }] }],
                 generationConfig: { 
                     responseMimeType: "application/json", 
-                    temperature: 0.2, // Lower = Faster
-                    maxOutputTokens: 600 // Limits length to stay under the 10s timer
+                    temperature: 0.1, // Lower temperature = faster processing
+                    maxOutputTokens: 500 // Keeps response short to beat the timer
                 }
             })
         });
 
         const aiData = await aiResponse.json();
+
+        // SAFETY GUARD: Check if candidates exist before reading index '0'
+        if (!aiData.candidates || !aiData.candidates[0]) {
+            throw new Error("AI took too long to respond. Please try selecting only 1 platform.");
+        }
+
         const resultText = aiData.candidates[0].content.parts[0].text;
 
         // 3. UPDATE USAGE

@@ -6,6 +6,11 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  // 1. Immediate CORS Handling
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
@@ -13,13 +18,8 @@ export default async function handler(req, res) {
     const { content, platforms, tone, email, lengthPreference } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
-    const today = new Date();
-    const dateString = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    // 1. DATABASE CHECK
+    // 2. DATABASE CHECK (Case-Insensitive)
     const cleanEmail = (email || "").toLowerCase().trim();
-    if (!cleanEmail) return res.status(400).json({ error: "Email is required" });
-
     let { data: user } = await supabase
       .from('user_usage')
       .select('*')
@@ -27,78 +27,60 @@ export default async function handler(req, res) {
       .single();
 
     if (!user) {
-      const { data: newUser, error: insertError } = await supabase.from('user_usage').insert([{ 
+      const { data: newUser } = await supabase.from('user_usage').insert([{ 
         email: cleanEmail, 
         usage_count: 0, 
         monthly_limit: 20, 
         membership_plan: 'Essential' 
       }]).select().single();
-      
-      if (insertError) throw new Error("Could not create user record");
       user = newUser;
     }
 
-    // 2. TIERED LIMIT CHECK
     const isProfessional = user.membership_plan === 'Professional';
-    if (!isProfessional && user.usage_count >= user.monthly_limit) {
-       return res.status(403).json({ error: "Your monthly limit has been reached." });
-    }
+    const lengthInstruction = lengthPreference === 'short' ? "1 paragraph" : "2 short paragraphs";
 
-    const lengthInstruction = lengthPreference === 'short' 
-      ? "Keep content punchy (1 paragraph)." 
-      : "Provide a deep-dive (2 compact paragraphs).";
-
-    // 3. AI CALL
+    // 3. FASTER AI CALL
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
     
-    const systemInstruction = `You are a Master Content Strategist.
-    Tone: "${tone}". ${lengthInstruction}
-    Today's date: ${dateString}. 
-
-    RULES:
-    1. Output MUST be a single, valid JSON object.
-    2. Use platform names as the ONLY top-level keys: ${platforms.join(', ')}. 
-    3. No markdown, no backticks, no numbering.
-    4. Newsletter: Only NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
-    5. Others: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.
-    6. Use <br><br> for breaks. No em-dashes.`;
+    const systemInstruction = `Master Marketer personality. Tone: ${tone}. Length: ${lengthInstruction}. 
+    Return ONLY a single JSON object. No markdown. 
+    Platforms: ${platforms.join(', ')}.
+    Newsletter keys: NEWSLETTER_SUBJECT, POST_CONTENT, CALL_TO_ACTION.
+    Other keys: POST_CONTENT, VISUAL_SUGGESTION, STRATEGIC_HASHTAGS, CALL_TO_ACTION.`;
 
     const aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: systemInstruction + `\n\nInput Source: "${content}"` }] }],
+        contents: [{ parts: [{ text: systemInstruction + `\n\nInput: "${content}"` }] }],
         generationConfig: { 
             responseMimeType: "application/json", 
-            temperature: 0.7 
+            temperature: 0.5,
+            maxOutputTokens: 800 // Forced shorter output to beat the 10s timer
         }
       })
     });
 
     const aiData = await aiResponse.json();
-    if (aiData.error) return res.status(500).json({ error: "AI Error: " + aiData.error.message });
+    if (aiData.error) return res.status(500).json({ error: "AI Busy. Try fewer platforms." });
 
     let resultText = aiData.candidates[0].content.parts[0].text;
     resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    // 4. SMART CREDIT DEDUCTION
+    // 4. USAGE UPDATE
     let currentUsage = user.usage_count;
     if (!isProfessional) {
-        currentUsage = user.usage_count + 1;
+        currentUsage++;
         await supabase.from('user_usage').update({ usage_count: currentUsage }).ilike('email', cleanEmail);
     }
     
-    // 5. RETURN RESULTS
-    const remainingCount = isProfessional ? 999 : (user.monthly_limit - currentUsage);
-
     return res.status(200).json({ 
       results: JSON.parse(resultText), 
-      remaining: remainingCount,
+      remaining: isProfessional ? 999 : (user.monthly_limit - currentUsage),
       plan: user.membership_plan
     });
 
   } catch (error) {
-    console.error("Studio Error:", error);
-    return res.status(500).json({ error: "The Studio encountered a snag. Try again!" });
+    return res.status(500).json({ error: "Timeout. Please try selecting only 1-2 platforms." });
   }
 }

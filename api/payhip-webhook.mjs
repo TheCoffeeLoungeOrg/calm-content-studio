@@ -10,21 +10,26 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
-  // Payhip sends data in different formats. This catches them all.
   const data = req.body;
   
-  // Payhip often uses these specific keys
-  const email = data.email || data.customer_email || data.subscriber_email;
-  const productName = data.product_name || data.plan_name || data.item_name;
-  const type = data.type; // e.g., 'paid', 'subscription.deleted'
+  // 1. Find the Email
+  const email = data.email || data.customer_email || data.subscriber_email || (data.customer && data.customer.email);
+  
+  // 2. Find the Product Name (Now checking the 'items' array)
+  let productName = data.product_name || data.plan_name || data.item_name;
+  
+  if (!productName && data.items && data.items.length > 0) {
+    productName = data.items[0].product_name; // This catches "Calm Content Hub"
+  }
+
+  const type = data.type; 
 
   console.log("Signal Received:", type);
   console.log("Email Found:", email);
   console.log("Product Found:", productName);
 
-  // If it's a cancellation, we handle that differently
+  // Handle Cancellations
   if (type === 'subscription.deleted' && email) {
-      console.log(`Processing Cancellation for ${email}`);
       await supabase
         .from('user_usage')
         .update({ monthly_limit: 0, membership_plan: 'Cancelled' })
@@ -33,19 +38,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: "Subscription marked as inactive" });
   }
 
-  // If it's a sale, we need the email and product name
+  // Safety Check
   if (!email || !productName) {
-    console.log("Payload Error: Could not find email or product name in:", JSON.stringify(data));
+    console.log("Payload Error: Data structure still not matching. Body:", JSON.stringify(data));
     return res.status(200).json({ status: "Ignored - Missing Data" });
   }
 
   try {
-    let plan = "Essential";
-    let limit = 20;
+    // Default to Professional since your test product is "Calm Content Hub"
+    // You can adjust this logic if you have multiple products
+    let plan = "Professional";
+    let limit = 999;
 
-    if (productName.toLowerCase().includes("professional")) {
-      plan = "Professional";
-      limit = 999;
+    // Optional: If you ever add an 'Essential' product, use this:
+    if (productName.toLowerCase().includes("essential")) {
+      plan = "Essential";
+      limit = 20;
     }
 
     const { error } = await supabase

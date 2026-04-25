@@ -7,61 +7,53 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   console.log("--- PAYHIP WEBHOOK START ---");
-
   if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
   const data = req.body;
-  
-  // 1. Find the Email (Checking all possible Payhip fields)
   const email = data.email || data.customer_email || data.subscriber_email || (data.customer && data.customer.email);
   
-  // 2. Find the Product or Plan Name
-  let productName = data.plan_name || data.product_name || data.item_name;
+  // The IDs from your checkout URLs
+  const ESSENTIAL_ID = "qLWxEKqxzk";
+  const PROFESSIONAL_ID = "APzD4y1LzE";
   
-  if (!productName && data.items && data.items.length > 0) {
-    productName = data.items[0].product_name;
-  }
+  // Payhip sends the ID in the pricing_plan_id field
+  const planID = data.pricing_plan_id || ""; 
+  
+  console.log("Incoming Email:", email);
+  console.log("Incoming Plan ID:", planID);
 
-  const type = data.type; 
-
-  console.log("Signal Received:", type);
-  console.log("Email Found:", email);
-  console.log("Product Found:", productName);
-
-  // 3. Handle Subscription Cancellations
-  if (type === 'subscription.deleted' && email) {
-      console.log(`Processing Cancellation for ${email}`);
-      await supabase
-        .from('user_usage')
-        .update({ 
-          'Monthly Limit': 0, 
-          'Membership Plan': 'Cancelled' 
-        })
+  // 1. Handle Cancellations
+  if (data.type === 'subscription.deleted' && email) {
+      await supabase.from('user_usage')
+        .update({ 'Monthly Limit': 0, 'Membership Plan': 'Cancelled' })
         .eq('email', email.toLowerCase().trim());
-      
-      return res.status(200).json({ status: "Subscription marked as inactive" });
+      return res.status(200).json({ status: "Cancelled" });
   }
 
-  // 4. Safety Check for New Sales
-  if (!email || !productName) {
-    console.log("Payload Error: Missing email or product name. Body:", JSON.stringify(data));
-    return res.status(200).json({ status: "Ignored - Missing Data" });
-  }
+  if (!email) return res.status(200).json({ status: "No email found" });
 
   try {
-    // 5. Smart Plan Mapping
-    // We check for "Essential" first, otherwise default to Professional
+    // 2. Logic based on specific IDs
     let plan = "Professional";
     let limit = 999;
 
-    if (productName.toLowerCase().includes("essential")) {
+    if (planID === ESSENTIAL_ID) {
       plan = "Essential";
       limit = 20;
+    } else if (planID === PROFESSIONAL_ID) {
+      plan = "Professional";
+      limit = 999;
+    } else {
+      // Fallback: If for some reason the ID is missing, check the name
+      const name = (data.plan_name || "").toLowerCase();
+      if (name.includes("essential")) {
+        plan = "Essential";
+        limit = 20;
+      }
     }
 
-    console.log(`Final Mapping: ${plan} (${limit} credits)`);
+    console.log(`Final Decision: Mapping ID ${planID} to ${plan} tier.`);
 
-    // 6. Upsert to Supabase (Update if exists, Insert if new)
     const { error } = await supabase
       .from('user_usage')
       .upsert({ 
@@ -72,15 +64,13 @@ export default async function handler(req, res) {
       }, { onConflict: 'email' });
 
     if (error) {
-      console.error("Supabase Error Details:", error);
+      console.error("Supabase Error:", error);
       return res.status(500).json({ error: error.message });
     }
 
-    console.log(`--- SUCCESS: ${email} added to ${plan} ---`);
-    return res.status(200).json({ status: "Success" });
+    return res.status(200).json({ status: "Success", plan: plan });
 
   } catch (err) {
-    console.error("Critical Webhook Failure:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: "Internal Error" });
   }
 }

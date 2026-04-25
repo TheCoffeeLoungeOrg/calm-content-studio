@@ -6,61 +6,67 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  // These logs will help us find the data Payhip is sending
-  console.log("--- WEBHOOK START ---");
-  console.log("Method:", req.method);
-  console.log("Body Content:", JSON.stringify(req.body));
+  console.log("--- PAYHIP WEBHOOK START ---");
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
+
+  // Payhip sends data in different formats. This catches them all.
+  const data = req.body;
+  
+  // Payhip often uses these specific keys
+  const email = data.email || data.customer_email || data.subscriber_email;
+  const productName = data.product_name || data.plan_name || data.item_name;
+  const type = data.type; // e.g., 'paid', 'subscription.deleted'
+
+  console.log("Signal Received:", type);
+  console.log("Email Found:", email);
+  console.log("Product Found:", productName);
+
+  // If it's a cancellation, we handle that differently
+  if (type === 'subscription.deleted' && email) {
+      console.log(`Processing Cancellation for ${email}`);
+      await supabase
+        .from('user_usage')
+        .update({ monthly_limit: 0, membership_plan: 'Cancelled' })
+        .eq('email', email.toLowerCase().trim());
+      
+      return res.status(200).json({ status: "Subscription marked as inactive" });
   }
 
- // Payhip sends different fields based on the event type
-  // A wider net to catch the email and product name
-  const email = req.body.email || req.body.customer_email || req.body.subscriber_email;
-  const productName = req.body.product_name || req.body.plan_name || req.body.item_name || req.body.subscription_name;
-
+  // If it's a sale, we need the email and product name
   if (!email || !productName) {
-    console.log("MISSING DATA: Email or Product Name not found in body");
-    return res.status(200).json({ status: "Incomplete data ignored" });
-  }
-
-  if (!email || !productName) {
-    console.log("MISSING DATA: Email or Product Name not found in body");
-    return res.status(200).json({ status: "Incomplete data ignored" });
+    console.log("Payload Error: Could not find email or product name in:", JSON.stringify(data));
+    return res.status(200).json({ status: "Ignored - Missing Data" });
   }
 
   try {
     let plan = "Essential";
     let limit = 20;
 
-    // Check for "Professional" in the name
     if (productName.toLowerCase().includes("professional")) {
       plan = "Professional";
       limit = 999;
     }
 
-    console.log(`Processing ${plan} for ${email}`);
-
     const { error } = await supabase
-  .from('user_usage') // <--- Make sure this matches your table name exactly
-  .upsert({ 
-    email: email.toLowerCase().trim(), 
-    membership_plan: plan, 
-    monthly_limit: limit,
-    usage_count: 0 
-  }, { onConflict: 'email' });
+      .from('user_usage')
+      .upsert({ 
+        email: email.toLowerCase().trim(), 
+        membership_plan: plan, 
+        monthly_limit: limit,
+        usage_count: 0 
+      }, { onConflict: 'email' });
+
     if (error) {
       console.error("Supabase Error:", error);
       return res.status(500).json({ error: error.message });
     }
-    console.log(`✅ DATABASE UPDATED: ${email} is now ${plan}`);
 
-    console.log("--- WEBHOOK SUCCESS ---");
-    return res.status(200).json({ status: "Success", plan: plan });
+    console.log(`--- SUCCESS: ${email} added to ${plan} ---`);
+    return res.status(200).json({ status: "Success" });
 
   } catch (err) {
-    console.error("Critical Webhook Failure:", err);
+    console.error("Critical Failure:", err);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }

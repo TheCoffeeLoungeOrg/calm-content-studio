@@ -15,8 +15,8 @@ export default async function handler(req, res) {
   // 1. Find the Email (Checking all possible Payhip fields)
   const email = data.email || data.customer_email || data.subscriber_email || (data.customer && data.customer.email);
   
-  // 2. Find the Product Name (Checking top-level and the 'items' array)
-  let productName = data.product_name || data.plan_name || data.item_name;
+  // 2. Find the Product or Plan Name
+  let productName = data.plan_name || data.product_name || data.item_name;
   
   if (!productName && data.items && data.items.length > 0) {
     productName = data.items[0].product_name;

@@ -20,25 +20,30 @@ export default async function handler(req, res) {
   const { email, content, tone, platforms, lengthPreference } = req.body;
 
   try {
-    // 2. Database Credit Check
+    // 2. Database Verification (Strict Gatekeeper)
     const { data: user, error } = await supabase
       .from('user_usage')
       .select('*')
-      .eq('email', email)
+      .eq('email', email.toLowerCase().trim())
       .single();
 
+    // If user is not found or error occurs, we STOP here.
     if (error || !user) {
-      return res.status(403).json({ error: 'Membership email not found.' });
+      console.log(`Access Denied: ${email} not found in database.`);
+      return res.status(403).json({ 
+        error: 'Membership email not found. Please ensure you are using the email associated with your subscription.' 
+      });
     }
     
-    const limit = parseInt(user['Monthly Limit']);
-    const usage = parseInt(user.usage_count);
+    // Use brackets for column names with spaces
+    const limit = parseInt(user['Monthly Limit']) || 0;
+    const usage = parseInt(user.usage_count) || 0;
 
     if (usage >= limit) {
       return res.status(403).json({ error: 'Monthly credit limit reached.' });
     }
 
-  // 3. AI Generation with Fallback Logic
+    // 3. AI Generation with Fallback Logic
     let aiData;
     const modelConfig = { 
       generationConfig: { responseMimeType: "application/json" }
@@ -70,17 +75,20 @@ export default async function handler(req, res) {
     } catch (primaryError) {
       console.warn("Gemini 3 Busy, falling back to Gemini 1.5...");
       
-      // Secondary Attempt: Gemini 1.5 Flash (using the latest stable alias)
+      // Secondary Attempt: Gemini 1.5 Flash (stable alias)
       const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", ...modelConfig });
       const result = await model15.generateContent(prompt);
       aiData = JSON.parse(result.response.text());
     }
 
-    // 4. Update Database (Increment)
+    // 4. Update Database (Increment usage and set last_used)
     const newCount = usage + 1;
     await supabase.from('user_usage')
-      .update({ usage_count: newCount, last_used: new Date().toISOString() })
-      .eq('email', email);
+      .update({ 
+        usage_count: newCount, 
+        last_used: new Date().toISOString() 
+      })
+      .eq('email', email.toLowerCase().trim());
 
     // 5. Send Success Response
     return res.status(200).json({
@@ -91,6 +99,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error("Vercel Execution Error:", err);
-    return res.status(500).json({ error: 'Studio error. Check console for model availability.' });
+    return res.status(500).json({ error: 'Studio error. Please try again in a moment.' });
   }
 }
